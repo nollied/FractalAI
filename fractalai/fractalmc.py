@@ -111,7 +111,7 @@ class FractalMC(Swarm):
         walker_data = list(set(np.array(self.walkers_id).astype(int)))
         self.data.update_values(set(walker_data + init_actions))
 
-    def run_swarm(self, state: np.ndarray=None, obs: np.ndarray=None, print_swarm: bool=False):
+    def run_swarm(self, state: np.ndarray=None, obs: np.ndarray=None, print_swarm: bool=False, print_info: bool=False):
         """
         Iterate the swarm by evolving and cloning each walker until a certain condition
         is met.
@@ -124,7 +124,7 @@ class FractalMC(Swarm):
             # This allows the deaths to recycle faster, and the Swarm becomes more flexible
             if self._i_simulation > 1:
                 self.clone_condition()
-            self.step_walkers()
+            self.step_walkers(print_info=print_info)
             if self._i_simulation > 1:
                 self.clone()
             elif self._i_simulation == 0:

@@ -398,7 +398,7 @@ class Swarm:
     def process_observations(self, observs: np.ndarray=None):
         return self._process_obs(observs)
 
-    def step_walkers(self):
+    def step_walkers(self, print_info: bool=False):
         """Sample an action for each walker, and act on the environment. This is how the Swarm
         evolves.
         :return: None.
@@ -447,6 +447,9 @@ class Swarm:
             self._end_cond[self._not_frozen][flag] = False
 
         self._n_samples_done += self.dt[self._not_frozen].sum()
+
+        if print_info:
+            print(f"\n0th index walker info:\n{infos[0]}")
 
     def evaluate_distance(self) -> np.ndarray:
         """Calculates the euclidean distance between pixels of two different arrays
