@@ -10,7 +10,7 @@ from fractalai.swarm import Swarm, DynamicTree
 class FractalMC(Swarm):
 
     def __init__(self, env, model, n_walkers: int=100, balance: float=1.,
-                 reward_limit: float=None, samples_limit: int=None, render_every: int=1e10,
+                 reward_limit: float=None, samples_limit: int=None, render_every: int=None,
                  accumulate_rewards: bool=True, dt_mean: float=None, dt_std: float=None,
                  min_dt: int=1, custom_reward: Callable=None, custom_end: Callable=None,
                  process_obs: Callable=None, custom_skipframe: Callable=None,
@@ -130,7 +130,9 @@ class FractalMC(Swarm):
             elif self._i_simulation == 0:
                 self.init_ids = self.walkers_id.copy()
             self._i_simulation += 1
-            if self._i_simulation % self.render_every == 0 and print_swarm:
+            if self.render_every is not None and self._i_simulation % self.render_every == 0:
+                self._env.render()
+            if print_swarm:
                 print(self)
                 clear_output(True)
 
