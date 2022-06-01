@@ -313,6 +313,10 @@ class Swarm:
     def states(self):
         return self.data.get_states(self.walkers_id)
 
+    @property
+    def infos(self):
+        return self.data.get_infos(self.walkers_id)
+
     def seed(self, seed):
         self.env._env.seed(seed)
         np.random.seed(seed)
@@ -345,6 +349,10 @@ class Swarm:
         self._old_rewards = self.rewards
         self.win_flag = False
         self.ends = np.zeros(self.n_walkers, dtype=bool)
+
+        self.true_best_walker_reward = -float("inf")
+        self.true_best_walker_state = None
+        self.true_best_walker_info = None
 
     def init_swarm(self, state: np.ndarray=None, obs: np.ndarray=None):
         """
@@ -449,7 +457,8 @@ class Swarm:
         self._n_samples_done += self.dt[self._not_frozen].sum()
 
         if print_info:
-            print(f"\n0th index walker info:\n{infos[0]}")
+            print(f"\nbest walker info:\n{self.true_best_walker_info}")
+            print(f"best reward: {self.true_best_walker_reward}")
 
     def evaluate_distance(self) -> np.ndarray:
         """Calculates the euclidean distance between pixels of two different arrays
@@ -490,6 +499,12 @@ class Swarm:
         self._will_clone[-1] = False
         # self._will_step[-1] = False
         best_walker = self.rewards.argmax()
+
+        if self.true_best_walker_reward < self.rewards[best_walker]:
+            self.true_best_walker_reward = copy.deepcopy(self.rewards[best_walker])
+            self.true_best_walker_state = copy.deepcopy(self.states[best_walker])
+            self.true_best_walker_info = copy.deepcopy(self.infos[best_walker])
+
         if best_walker != self.n_walkers - 1:
             self.walkers_id[-1] = int(self.walkers_id[best_walker])
             self.observations[-1] = copy.deepcopy(self.observations[best_walker])
