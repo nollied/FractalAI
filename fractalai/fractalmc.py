@@ -112,7 +112,7 @@ class FractalMC(Swarm):
         walker_data = list(set(np.array(self.walkers_id).astype(int)))
         self.data.update_values(set(walker_data + init_actions))
 
-    def run_swarm(self, state: np.ndarray=None, obs: np.ndarray=None, print_swarm: bool=False, print_info: bool=False):
+    def run_swarm(self, state: np.ndarray=None, obs: np.ndarray=None, print_swarm: bool=False, print_info: bool=False, post_iter_lambda: Callable=None):
         """
         Iterate the swarm by evolving and cloning each walker until a certain condition
         is met.
@@ -136,6 +136,9 @@ class FractalMC(Swarm):
             if print_swarm:
                 print(self)
                 clear_output(True)
+
+            if post_iter_lambda is not None:
+                post_iter_lambda(self)
 
         if print_swarm:
             print(self)
