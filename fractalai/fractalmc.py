@@ -86,6 +86,7 @@ class FractalMC(Swarm):
         self.init_ids = np.zeros(self.n_walkers).astype(int)
 
     def clone(self):
+        print("CLONING!")
         super(FractalMC, self).clone()
         if self._clone_idx is None:
             return

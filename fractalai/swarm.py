@@ -242,6 +242,7 @@ class Swarm:
         # Environment information sources
         self.observations = None
         self.rewards = np.zeros(self.n_walkers)
+        self.costs = np.zeros(self.n_walkers)
         # Internal masks
         # True when the boundary condition is met
         self._end_cond = np.zeros(self.n_walkers, dtype=bool)
@@ -281,13 +282,17 @@ class Swarm:
             score_prog = (self.rewards.max() / self.reward_limit) * 100
             progress = max(progress, score_prog)
 
-        text = "Environment: {} | Walkers: {} | Deaths: {} | data_size {}\n" \
+        n_frozen = self.n_walkers - sum(self._not_frozen)
+        n_cloned = sum(self._will_clone)
+        best_cost = self.true_best_walker_cost
+
+        text = "Environment: {} (best_cost={}) | Walkers: {} (frozen={}, cloned={}) | Deaths: {} | data_size {}\n" \
                "Total samples: {} Progress: {:.2f}%\n" \
                "Reward: mean {:.2f} | Dispersion: {:.2f} | max {:.2f} | min {:.2f} | std {:.2f}\n"\
                "Episode length: mean {:.2f} | Dispersion {:.2f} | max {:.2f} | min {:.2f} " \
                "| std {:.2f}\n" \
                "Dt: mean {:.2f} | Dispersion: {:.2f} | max {:.2f} | min {:.2f} | std {:.2f}\n"\
-               "Status: {}".format(self._env.name, self.n_walkers, self._end_cond.sum(),
+               "Status: {}".format(self._env.name, best_cost, self.n_walkers, n_frozen, n_cloned, self._end_cond.sum(),
                                    len(self.data.states.keys()),
                                    self._n_samples_done, progress,
                                    self.rewards.mean(), self.rewards.max() - self.rewards.min(),
@@ -326,6 +331,7 @@ class Swarm:
          the Swarm was instantiated."""
         self.observations = None
         self.rewards = np.zeros(self.n_walkers)
+        self.costs = np.zeros(self.n_walkers)
         # Internal masks
         self._end_cond = np.zeros(self.n_walkers, dtype=bool)
         self._will_clone = np.zeros(self.n_walkers, dtype=bool)
@@ -350,7 +356,7 @@ class Swarm:
         self.win_flag = False
         self.ends = np.zeros(self.n_walkers, dtype=bool)
 
-        self.true_best_walker_reward = -float("inf")
+        self.true_best_walker_cost = float("inf")
         self.true_best_walker_state = None
         self.true_best_walker_info = None
 
@@ -369,6 +375,7 @@ class Swarm:
         self.observations = self.process_observations(np.array([obs.copy()
                                                       for _ in range(self.n_walkers)]))
         self.rewards = np.zeros(self.n_walkers, dtype=np.float32)
+        self.costs = np.zeros(self.n_walkers)
         self._end_cond = np.zeros(self.n_walkers, dtype=bool)
         # Internal masks
         self._will_clone = np.zeros(self.n_walkers, dtype=bool)
@@ -419,7 +426,7 @@ class Swarm:
 
         states = self.data.get_states(self.walkers_id[self._not_frozen])
         old_infos = self.data.get_infos(self.walkers_id[self._not_frozen])
-        new_state, observs, _rewards,\
+        new_states, observs, _rewards,\
             terms, infos = self._env.step_batch(actions, states=states,
                                                 n_repeat_action=self.dt[self._not_frozen])
         self.times[self._not_frozen] = (self.times[self._not_frozen] +
@@ -431,10 +438,11 @@ class Swarm:
         self.ends = self.custom_end(infos=infos, old_infos=old_infos, rewards=_rewards,
                                     times=self.times[self._not_frozen], terminals=terms,
                                     old_rewards=self.rewards[self._not_frozen])
+        self.store_best_state(infos, new_states)
         # Save data and update sample count
         new_ids = self._n_samples_done + np.arange(self._not_frozen.sum()).astype(int)
         self.walkers_id[self._not_frozen] = new_ids
-        self.data.append(walker_ids=new_ids, states=new_state, actions=actions, infos=infos)
+        self.data.append(walker_ids=new_ids, states=new_states, actions=actions, infos=infos)
         self.observations[self._not_frozen] = self.process_observations(observs)
         non_neg_reward = np.array(rewards) >= 0
         terms = np.array([inf["terminal"] for inf in infos])
@@ -458,7 +466,7 @@ class Swarm:
 
         if print_info:
             print(f"\nbest walker info:\n{self.true_best_walker_info}")
-            print(f"best reward: {self.true_best_walker_reward}")
+            print(f"best cost: {self.true_best_walker_cost}")
 
     def evaluate_distance(self) -> np.ndarray:
         """Calculates the euclidean distance between pixels of two different arrays
@@ -491,6 +499,17 @@ class Swarm:
         self._virtual_reward = vir_reward
         return vir_reward
 
+    def store_best_state(self, infos, states):
+        assert len(infos) == len(states)
+
+        for i, info in enumerate(infos):
+            cost = info["new_cost"]
+            if cost < self.true_best_walker_cost:
+                print("new best walker!")
+                self.true_best_walker_cost = cost
+                self.true_best_walker_state = copy.deepcopy(states[i])
+                self.true_best_walker_info = copy.deepcopy(info)
+
     def track_best_walker(self):
         """The last walker represents the best solution found so far. It gets frozen so
          other walkers can always compare to it when cloning."""
@@ -499,11 +518,6 @@ class Swarm:
         self._will_clone[-1] = False
         # self._will_step[-1] = False
         best_walker = self.rewards.argmax()
-
-        if self.true_best_walker_reward < self.rewards[best_walker]:
-            self.true_best_walker_reward = copy.deepcopy(self.rewards[best_walker])
-            self.true_best_walker_state = copy.deepcopy(self.states[best_walker])
-            self.true_best_walker_info = copy.deepcopy(self.infos[best_walker])
 
         if best_walker != self.n_walkers - 1:
             self.walkers_id[-1] = int(self.walkers_id[best_walker])
